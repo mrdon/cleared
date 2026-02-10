@@ -2,17 +2,25 @@
 
 Agentic small business accounting. Agents do the bookkeeping autonomously — the human spends less than 5 minutes a day.
 
-## How It Works
+## Why Cleared?
 
-Three layers:
+- **Self-improving.** Nightly agents analyze patterns, rewrite their own logic, optimize workflows, and generate regression tests. A test ratchet prevents regressions — the system can only get better.
+- **You manage, LLM develops.** Swipe to correct a transaction and the system learns. Customize via natural language ("batch my notifications") and the LLM rewrites agents for you.
+- **Git is the audit trail.** Data, logic, rules, and tests all live in one repo. Every change is a commit — fully reviewable, fully reversible.
+- **Deterministic by default.** Daily workflows are pure code — no LLM in the loop. The LLM is only used for learning, adapting, and edge cases.
+- **Sandboxed.** Agents run in a Monty sandbox. The Go runtime enforces accounting invariants on every write. Agents evolve freely; the books stay correct.
+
+## How It Works
 
 | Layer | What | Technology |
 |-------|------|------------|
-| **Runtime** | Primitives, sandbox, validation, CLI | Go binary |
-| **Agents** | Business logic, workflows, improvement loops | Python scripts (Monty sandbox) |
-| **Data** | Accounting records, rules, config | CSV/YAML in git |
+| **UI** | Swipe to approve/correct, chat to customize | Mobile web |
+| **Healing** | Nightly agents that learn from corrections, rewrite logic, generate tests | Agents + LLM |
+| **Workflow** | Deterministic agents — ingest, classify, route, commit | Python (Monty sandbox) |
+| **Runtime** | Primitives, invariant enforcement, sandbox | Go binary |
+| **Data** | Ledger, agent scripts, tests — all version controlled | CSV/YAML in git |
 
-Agents are top-level Python scripts that call Go primitives as flat global functions (`journal_add_double`, `importer_scan`, etc.). They run in a [Monty](https://github.com/pydantic/pydantic-monty) sandbox — no filesystem, no network, no imports. The Go runtime enforces 6 double-entry accounting invariants on every write. Every data change is a git commit.
+Workflow agents handle the daily bookkeeping — deterministic code that processes bank data, classifies transactions, and routes by confidence. When they hit unknowns, they call LLM primitives for classification. Healing agents run nightly — they analyze corrections, rewrite workflow logic, optimize rules, and generate regression tests. Both are sandboxed Python scripts, but they serve different purposes: one does the work, the other improves it.
 
 ## Quick Start
 
@@ -61,26 +69,29 @@ The agent parses transactions, creates journal entries, moves processed files, a
 ## Architecture
 
 ```
-Go Runtime (primitives + validation)
+Go Runtime (primitives + 6 invariants)
     ↕ JSON-RPC 2.0 over stdio
 Python Bridge (Monty sandbox)
     ↕ external function calls
 Agent Scripts (flat primitives, no imports)
-    ↕ reads/writes
-Git Repository (CSV data, YAML config)
+    ↕ reads/writes/rewrites
+Git Repository (data + logic + rules + tests)
 ```
 
-Agents call primitives like `journal_add_double(date=..., debit_account=5020, credit_account=1010, amount=4.00)`. The Go runtime validates every entry against 6 invariants (balanced debits/credits, valid accounts, sequential IDs, dates within month, exact decimals, unique IDs) before writing.
+The Go runtime is the constitution — it enforces invariants that no agent can bypass: balanced debits/credits, valid account references, sequential IDs, dates within month, exact decimals, and unique entries. Agents can rewrite themselves, create new rules, and generate tests, but the books always balance.
 
 ## Project Structure
+
+Everything is in git — data, logic, rules, and tests:
 
 ```
 my-business/
 ├── cleared.yaml                    # Business config
 ├── accounts/chart-of-accounts.csv  # Chart of accounts
-├── rules/categorization-rules.yaml # Vendor categorization rules
-├── agents/*.py                     # Agent scripts
-├── logs/agent-log.csv              # Agent execution log
+├── agents/*.py                     # Agent scripts — logic + rules live here, LLM-maintained
+├── tests/*.py                      # Agent-generated regression tests (ratchet)
+├── scripts/*.py                    # Shared sub-scripts extracted by learning agents
+├── logs/agent-log.csv              # Append-only agent execution log
 ├── import/                         # Drop bank CSVs here
 │   └── processed/                  # Processed files moved here
 └── YYYY/MM/journal.csv             # Monthly double-entry ledger
