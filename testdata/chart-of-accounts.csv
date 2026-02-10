@@ -1,0 +1,12 @@
+account_id,account_name,account_type,parent_id,tax_line,description
+1010,Business Checking,asset,,,Primary checking account
+1020,Business Savings,asset,,,Savings account
+2010,Credit Card,liability,,,Business credit card
+3010,Owner's Equity,equity,,,Owner's equity
+4010,Service Revenue,revenue,,,
+4020,Product Revenue,revenue,,,
+5010,Advertising & Marketing,expense,,schedule_c_8,Advertising costs
+5020,Software & SaaS,expense,,schedule_c_18,Software subscriptions
+5030,Office Supplies,expense,,schedule_c_18,Office supplies and expenses
+5040,Professional Services,expense,,schedule_c_17,"Legal, accounting, consulting"
+5050,Shipping & Postage,expense,,schedule_c_18,Postage and shipping costs

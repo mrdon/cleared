@@ -1,0 +1,13 @@
+entry_id,date,account_id,description,debit,credit,counterparty,reference,confidence,status,evidence,receipt_hash,tags,notes
+2025-01-001a,2025-01-03,5020,GitHub Pro subscription,4.00,,GitHub,plaid_abc123,0.98,auto-confirmed,rule match: GITHUB*,,recurring;software,
+2025-01-001b,2025-01-03,1010,GitHub Pro subscription,,4.00,GitHub,plaid_abc123,0.98,auto-confirmed,rule match: GITHUB*,,recurring;software,
+2025-01-002a,2025-01-05,5020,AWS services,127.50,,Amazon Web Services,plaid_def456,0.96,auto-confirmed,rule match: AWS*,,recurring;software,
+2025-01-002b,2025-01-05,1010,AWS services,,127.50,Amazon Web Services,plaid_def456,0.96,auto-confirmed,rule match: AWS*,,recurring;software,
+2025-01-003a,2025-01-10,5020,Dropbox Business Plan,15.00,,Dropbox,plaid_ghi789,0.95,auto-confirmed,rule match: DROPBOX*,,recurring;software,
+2025-01-003b,2025-01-10,1010,Dropbox Business Plan,,15.00,Dropbox,plaid_ghi789,0.95,auto-confirmed,rule match: DROPBOX*,,recurring;software,
+2025-01-004a,2025-01-15,1010,Acme Consulting Invoice 1042,3500.00,,Acme Consulting,plaid_jkl012,0.99,auto-confirmed,invoice match,,income,
+2025-01-004b,2025-01-15,4010,Acme Consulting Invoice 1042,,3500.00,Acme Consulting,plaid_jkl012,0.99,auto-confirmed,invoice match,,income,
+2025-01-005a,2025-01-18,5030,Office supplies,42.99,,Amazon,plaid_mno345,0.70,pending-review,LLM classification,,supplies,
+2025-01-005b,2025-01-18,1010,Office supplies,,42.99,Amazon,plaid_mno345,0.70,pending-review,LLM classification,,supplies,
+2025-01-006a,2025-01-22,5050,USPS shipping,8.75,,USPS,plaid_pqr678,0.92,auto-confirmed,rule match: USPS*,,shipping,
+2025-01-006b,2025-01-22,1010,USPS shipping,,8.75,USPS,plaid_pqr678,0.92,auto-confirmed,rule match: USPS*,,shipping,
