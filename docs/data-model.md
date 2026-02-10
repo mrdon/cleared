@@ -10,8 +10,8 @@ What `cleared init` creates:
 ├── cleared.yaml                         # Business config, agent schedules, thresholds
 ├── accounts/
 │   └── chart-of-accounts.csv            # Account definitions with tax mappings
-├── rules/
-│   └── categorization-rules.yaml        # Learned vendor→category mappings
+├── rules/                              # Agent-managed data (any format agents find useful)
+│   └── ...                              # Go does not parse or enforce contents
 ├── agents/                              # Python agent scripts (LLM-written, top-level scripts)
 │   ├── ingest.py                        # Import + classify + route
 │   └── ...                              # More agents added over time
@@ -79,22 +79,11 @@ entry_id,date,account_id,description,debit,credit,counterparty,reference,confide
 
 Ship with ~30 default accounts per entity type.
 
-### categorization-rules.yaml
+### Categorization Rules
 
-```yaml
-rules:
-  - vendor_pattern: "GITHUB*"
-    vendor_name: "GitHub"
-    account_id: 5020
-    confidence: 0.98
-    times_seen: 12
-    times_confirmed: 12
-    times_corrected: 0
-    last_seen: "2025-01-03"
-    avg_amount: 4.00
-    amount_stddev: 0.00
-    source: "user_confirmed"
-```
+Categorization logic lives **inside agent scripts**, not in a separate Go-managed rules file. Learning agents rewrite the matching logic in agent scripts as they analyze user corrections. This lets the LLM evolve the rules format freely without being constrained by a fixed schema.
+
+The `rules/` directory is available for agents to store data in whatever format they find useful, but Go does not parse or enforce its contents.
 
 ### agent-log.csv
 

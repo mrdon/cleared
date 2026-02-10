@@ -55,26 +55,22 @@
 │  ┌─────────────────────────────────────────────────────┐  │
 │  │  Primitives (Go, exposed as flat Python functions)    │  │
 │  │                                                       │  │
-│  │  journal_add_double, journal_query, journal_void ...  │  │
+│  │  journal_add_double, journal_query ...                 │  │
 │  │  accounts_list, accounts_get, accounts_exists ...     │  │
 │  │  importer_scan, importer_parse, importer_mark_...     │  │
-│  │  rules_match, rules_add, rules_update, rules_list     │  │
-│  │  git_commit, git_log                                  │  │
-│  │  queue_add_review, queue_pending                      │  │
-│  │  config_get                                           │  │
-│  │  ctx_log, ctx_emit                                    │  │
-│  │  llm_classify, llm_summarize (optional, future)       │  │
+│  │  git_commit                                           │  │
+│  │  queue_add_review                                     │  │
+│  │  config_get, ctx_log, ctx_dry_run                     │  │
+│  │  llm_classify, llm_summarize (future)                 │  │
 │  └─────────────────────────────────────────────────────┘  │
 │                                                            │
 │  ┌─────────────────────────────────────────────────────┐  │
 │  │  Validation Layer (the "constitution")                │  │
 │  │                                                       │  │
 │  │  • 6 double-entry invariants (always enforced)        │  │
-│  │  • Monty type_check (arg types, missing params)        │  │
-│  │  • Dry run (execute against synthetic data)           │  │
-│  │  • Behavioral diff (compare before/after)             │  │
-│  │  • Resource limits (time, memory, tx count)           │  │
-│  │  • Auto-revert on anomaly detection                   │  │
+│  │  • Monty type_check (future: arg types, params)       │  │
+│  │  • Dry run (future: synthetic data execution)         │  │
+│  │  • Behavioral diff (future: compare before/after)     │  │
 │  └─────────────────────────────────────────────────────┘  │
 └────────────┬─────────────────────────────────────────────┘
              │ persists to
@@ -84,7 +80,7 @@
 │                                                            │
 │  cleared.yaml              — business config + schedules   │
 │  accounts/coa.csv          — chart of accounts             │
-│  rules/categorization.yaml — learned vendor→category rules │
+│  rules/                    — agent-managed categorization   │
 │  agents/*.py               — agent scripts (version ctrl)  │
 │  scripts/*.py              — shared utility scripts        │
 │  templates/*.html          — email/report templates        │
@@ -121,21 +117,15 @@ cleared/
 │   ├── importer/                        # Bank CSV parsers
 │   │   ├── importer.go                 # BankImporter interface + registry
 │   │   └── chase.go                    # Chase parser
-│   ├── gitops/gitops.go                # Git operations (go-git)
+│   ├── gitops/gitops.go                # Git operations (exec.Command)
 │   ├── sandbox/                         # Python execution
-│   │   ├── sandbox.go                  # ScriptRunner interface
-│   │   ├── monty.go                    # Monty subprocess implementation
-│   │   ├── primitives.go              # Go→Python primitive bindings
-│   │   └── validate.go                # Script validation/linting
-│   ├── scheduler/scheduler.go          # Cron + file watch + event triggers
+│   │   ├── bridge.py                  # Monty JSON-RPC bridge (embedded)
+│   │   ├── bridge.go                  # Bridge subprocess + JSON-RPC
+│   │   └── primitives.go              # Runtime + Go→Python primitive bindings
 │   ├── commands/                        # Cobra CLI (sx pattern)
 │   │   ├── root.go
-│   │   ├── init_cmd.go                 # cleared init
-│   │   ├── agent_cmd.go               # cleared agent {run|start|status|log}
-│   │   ├── import_cmd.go              # cleared import (manual override)
-│   │   ├── add_cmd.go                 # cleared add (manual entry)
-│   │   ├── list_cmd.go                # cleared list
-│   │   └── status_cmd.go              # cleared status
+│   │   ├── init.go                    # cleared init
+│   │   └── agent.go                   # cleared agent run
 │   └── id/id.go                        # Entry ID generation
 ├── testdata/
 ├── Makefile                             # From sx patterns
@@ -150,28 +140,26 @@ cleared/
 
 ## Sandbox Interface
 
+Currently implemented as `Bridge` directly (ScriptRunner interface deferred until Validate/DryRun are wired in):
+
 ```go
-// internal/sandbox/sandbox.go
+// internal/sandbox/bridge.go
 
-// ScriptRunner executes Python agent scripts in a sandbox.
-// Implementation-agnostic — swap Monty for alternatives without changing callers.
-type ScriptRunner interface {
-    // Run executes a script. Primitives are registered separately;
-    // externalFunctions lists which ones this script is allowed to call.
-    Run(ctx context.Context, script string, externalFunctions []string) (*Result, error)
+// Bridge manages the Python bridge subprocess and JSON-RPC communication.
+// bridge.py is embedded via //go:embed and written to a temp dir at runtime.
+type Bridge struct { ... }
 
-    // Validate runs Monty's type_check against primitive type stubs.
-    // Also checks for forbidden constructs (open, eval, exec, __import__).
-    Validate(script string) []ValidationIssue
-
-    // DryRun executes against synthetic data with recording primitives.
-    DryRun(ctx context.Context, script string) (*DryRunResult, error)
-}
+func NewBridge() (*Bridge, error)
+func (b *Bridge) RegisterPrimitive(name string, handler PrimitiveHandler)
+func (b *Bridge) RunScript(script string, externals []string) (any, error)  // 30s timeout
+func (b *Bridge) Shutdown() error
 
 // PrimitiveHandler is a Go function exposed to Python scripts.
 // Primitives are flat functions (journal_add_double, not journal.add).
 type PrimitiveHandler func(args []any, kwargs map[string]any) (any, error)
 ```
+
+Future: `ScriptRunner` interface wrapping Bridge with `Validate()` and `DryRun()` methods (spike3 proved the approach).
 
 ## Go ↔ Python Communication
 
@@ -195,16 +183,13 @@ ID correlation enables pipelining — multiple scripts can run concurrently over
 | Library | Purpose |
 |---------|---------|
 | `github.com/spf13/cobra` | CLI framework |
-| `github.com/go-git/go-git/v5` | Git operations (pure Go) |
 | `github.com/shopspring/decimal` | Exact decimal arithmetic |
 | `gopkg.in/yaml.v3` | Config YAML |
-| `github.com/robfig/cron/v3` | Cron scheduler |
-| `github.com/fsnotify/fsnotify` | File watch for import/ dir |
 | `encoding/csv` (stdlib) | CSV read/write |
 | `pydantic-monty` (via uv) | Python sandbox runtime |
 | `uv` | Python environment + dependency management |
 
-Future: `excelize`, `chi`, Anthropic/OpenAI Go SDKs, wazero (Monty→WASM)
+Future: `excelize`, `chi`, `robfig/cron`, `fsnotify`, Anthropic/OpenAI Go SDKs, wazero (Monty→WASM)
 
 ## Build & CI
 

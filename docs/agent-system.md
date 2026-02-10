@@ -14,7 +14,7 @@ An agent is a top-level Python script in the git repo that:
 name: Daily Ingest
 trigger: schedule
 schedule: 0 6 * * *
-description: Import new bank transactions, classify via rules, route by confidence
+description: Import new bank transactions, classify inline, route by confidence
 """
 files = importer_scan()
 if not files:
@@ -31,38 +31,52 @@ else:
         ctx_log("Parsed " + str(len(txns)) + " transactions from " + f["name"])
 
         for txn in txns:
-            match = rules_match(description=txn["description"], amount=txn["amount"])
+            # Categorization logic lives here in the agent — LLM learning agents
+            # rewrite this section as they learn from user corrections.
+            desc = txn["description"]
+            confidence = 0.0
+            account_id = 5030
+            vendor = ""
 
-            if match and match["confidence"] >= threshold:
+            if "GITHUB" in desc:
+                account_id = 5020
+                confidence = 0.98
+                vendor = "GitHub"
+            elif "AWS" in desc:
+                account_id = 5020
+                confidence = 0.96
+                vendor = "Amazon Web Services"
+
+            if confidence >= threshold:
                 if txn["amount"] < 0:
                     journal_add_double(
-                        date=txn["date"], description=txn["description"],
-                        debit_account=match["account_id"], credit_account=1010,
-                        amount=abs(txn["amount"]), counterparty=match["vendor_name"],
-                        reference=txn["reference"], confidence=match["confidence"],
-                        status="auto-confirmed", evidence="rule match: " + match["pattern"])
+                        date=txn["date"], description=desc,
+                        debit_account=account_id, credit_account=1010,
+                        amount=abs(txn["amount"]), counterparty=vendor,
+                        reference=txn["reference"], confidence=confidence,
+                        status="auto-confirmed", evidence="rule: inline match")
                 else:
                     journal_add_double(
-                        date=txn["date"], description=txn["description"],
+                        date=txn["date"], description=desc,
                         debit_account=1010, credit_account=4010,
-                        amount=txn["amount"], counterparty=match["vendor_name"],
-                        reference=txn["reference"], confidence=match["confidence"],
-                        status="auto-confirmed", evidence="rule match: " + match["pattern"])
+                        amount=txn["amount"], counterparty=vendor,
+                        reference=txn["reference"], confidence=confidence,
+                        status="auto-confirmed", evidence="rule: inline match")
                 total_confirmed = total_confirmed + 1
             else:
                 if txn["amount"] < 0:
                     journal_add_double(
-                        date=txn["date"], description=txn["description"],
+                        date=txn["date"], description=desc,
                         debit_account=5030, credit_account=1010,
                         amount=abs(txn["amount"]), reference=txn["reference"],
                         confidence=0.0, status="pending-review", evidence="no confident match")
                 else:
                     journal_add_double(
-                        date=txn["date"], description=txn["description"],
+                        date=txn["date"], description=desc,
                         debit_account=1010, credit_account=4010,
                         amount=txn["amount"], reference=txn["reference"],
                         confidence=0.0, status="pending-review", evidence="no confident match")
-                queue_add_review(entry_id="pending", description=txn["description"], confidence=0.0)
+                queue_add_review(entry_id="pending", description=desc, confidence=0.0)
                 total_review = total_review + 1
 
             total_imported = total_imported + 1
@@ -73,6 +87,8 @@ else:
     ctx_log("Done: " + str(total_confirmed) + " auto-confirmed, " + str(total_review) + " for review")
     {"imported": total_imported, "confirmed": total_confirmed, "review": total_review}
 ```
+
+Note: categorization logic lives **inside the agent script**, not in a separate rules engine. This is intentional — learning agents rewrite this section as they analyze user corrections. The LLM is the developer; the agent script is the artifact it produces and evolves.
 
 ### Monty Sandbox Constraints
 
@@ -122,11 +138,10 @@ Primitives use `snake_case` with a domain prefix (e.g., `journal_add_double`, no
 journal_add_double(date, description, debit_account, credit_account, amount,
                    counterparty=None, reference=None, confidence=0.0,
                    status="pending-review", evidence=None)  # balanced by construction
-journal_query(status=None, since=None, month=None, account=None)  # read entries
-journal_void(entry_id, reason)           # create reversing entry
-journal_update_status(entry_id, status)  # confirm, correct, etc.
-journal_balance(account=None)            # calculate account balances
+journal_query(status=None, year=None, month=None)  # read entries
 ```
+
+Future: `journal_void`, `journal_update_status`, `journal_balance`
 
 ### Accounts
 ```python
@@ -141,27 +156,17 @@ accounts_by_type(account_type)     # filter by asset/liability/etc.
 importer_scan()                    # list new files in import/
 importer_parse(filename)           # parse bank CSV → list of transaction dicts
 importer_mark_processed(filename)  # move to import/processed/
-importer_deduplicate(txns)         # filter out already-imported
-```
-
-### Rules
-```python
-rules_match(description, amount=None)  # find best matching rule
-rules_add(pattern, account_id, vendor_name, confidence)  # create new rule
-rules_update(rule_id, ...)         # modify existing rule
-rules_list()                       # all rules
+importer_deduplicate(txns)         # pass-through for now
 ```
 
 ### Git
 ```python
 git_commit(message)                # stage all + commit
-git_log(n=10)                      # recent commits
 ```
 
 ### Queue
 ```python
 queue_add_review(entry_id, description, confidence=0.0)  # add to swipe queue
-queue_pending()                    # list pending items
 ```
 
 ### Config
@@ -172,14 +177,14 @@ config_get(key)                    # read config value by dotted key, e.g. "thre
 ### Context
 ```python
 ctx_log(message)                   # write to agent log
-ctx_emit(event_name, data=None)    # trigger event-based agents
+ctx_dry_run()                      # returns true if dry-run mode
 ```
 
-### LLM (optional, future)
-```python
-llm_classify(description, context=None)  # categorize a transaction
-llm_summarize(data, prompt)              # generate text summary
-```
+Future: `ctx_emit(event_name)`, `queue_pending()`, `git_log()`, `llm_classify()`, `llm_summarize()`
+
+### No rules primitives
+
+Categorization logic lives **inside agent scripts**, not in a Go rules engine. This is intentional — agents own their matching logic, and learning agents rewrite it over time. The LLM evolves the rules format freely without being constrained by a fixed YAML schema.
 
 ### Transaction Dict Shape
 Primitives return and accept transaction dicts:

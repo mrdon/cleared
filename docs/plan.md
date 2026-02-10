@@ -14,13 +14,15 @@ A fully agentic small business accounting system. Agents do the bookkeeping auto
 
 ## Architecture
 
-Three layers — see [Architecture](./architecture.md):
+Five layers — see [Architecture](./architecture.md):
 
 | Layer | What | Changes how? |
 |-------|------|-------------|
-| **Runtime** (Go binary) | Primitives, sandbox, scheduler, web UI, validation | Compiled releases only |
-| **Agents** (Python scripts) | Business logic, workflows, improvement loops | LLM writes/modifies, user approves |
-| **Data** (CSV/YAML in git) | Accounting records, rules, config | Agents write, git tracks |
+| **UI** | Swipe to approve/correct, chat to customize | User interaction |
+| **Healing** (Agents + LLM) | Nightly learning, rewrite logic, generate tests | LLM writes/modifies, user approves |
+| **Workflow** (Agents) | Deterministic daily workflows, LLM for unknowns | LLM writes/modifies, user approves |
+| **Runtime** (Go binary) | Primitives, sandbox, invariant enforcement | Compiled releases only |
+| **Data** (CSV/YAML in git) | Ledger, agent scripts, tests | Agents write, git tracks |
 
 ## Key Decisions
 
@@ -31,7 +33,7 @@ Three layers — see [Architecture](./architecture.md):
 | Agent runtime | Monty subprocess via `uv run` | uv manages Python + pydantic-monty dependency; `ScriptRunner` interface allows swapping later |
 | IPC protocol | JSON-RPC 2.0 over stdio | Standard protocol (same as MCP), supports pipelining for concurrent scripts |
 | Agent format | Top-level scripts, flat primitives | No `run(ctx)`, no `from cleared import`. Primitives are global functions (`journal_add`, not `journal.add`). Last expression = output |
-| Rules vs logic | Rules as data (YAML), agents as logic (Python) | Different change cadences, multiple agents share rules, better auditability |
+| Rules vs logic | Rules as agent logic (Python), not Go-managed YAML | LLM agents rewrite matching logic directly; no fixed schema constrains evolution |
 | Validation | Monty type_check + dry run + behavioral diff | Monty's built-in type checker replaces external linting (ruff, etc.) |
 | Data format | CSV in git repo | Portable, auditable, no vendor lock-in |
 | Orchestration | Python control flow + event emission | if/for is clearer than formal behavior trees; `ctx_emit()` for inter-agent coordination |
@@ -63,7 +65,7 @@ All 4 spikes passed. See [Spike Plan](./spikes.md) for detailed results.
 | Phase | Status | What |
 |-------|--------|------|
 | **Foundation** | **DONE** | Go services (journal, accounts, importer, gitops, validation) + CLI (`init`, `agent run`) |
-| **Brain** | | Categorization engine (rules + LLM fallback), bootstrap import |
+| **Brain** | | LLM agent generation, bootstrap import, learning from corrections |
 | **Reports** | | P&L, Balance Sheet, Excel export, CPA package |
 | **Swipe UI** | | `cleared server`, web swipe UI, chat interface, meta-agent |
 | **Intelligence** | | Self-improvement agents (learning, optimization, testing w/ test ratchet, reconciliation, accrual anticipator, month-end close rehearsal) |
