@@ -35,3 +35,7 @@ coverage.html
 *.temp
 tmp/
 temp/
+
+# Environment and local config
+.env
+.claude/
