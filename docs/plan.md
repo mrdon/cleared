@@ -60,13 +60,26 @@ All 4 spikes passed. See [Spike Plan](./spikes.md) for detailed results.
 
 ## Full Roadmap (post-spikes)
 
-| Phase | What |
-|-------|------|
-| **Foundation** | Go services (journal, accounts, importer, gitops, validation) + CLI (`init`, `agent run`) |
-| **Brain** | Categorization engine (rules + LLM fallback), bootstrap import |
-| **Reports** | P&L, Balance Sheet, Excel export, CPA package |
-| **Swipe UI** | `cleared server`, web swipe UI, chat interface, meta-agent |
-| **Intelligence** | Self-improvement agents (learning, optimization, testing w/ test ratchet, reconciliation, accrual anticipator, month-end close rehearsal) |
+| Phase | Status | What |
+|-------|--------|------|
+| **Foundation** | **DONE** | Go services (journal, accounts, importer, gitops, validation) + CLI (`init`, `agent run`) |
+| **Brain** | | Categorization engine (rules + LLM fallback), bootstrap import |
+| **Reports** | | P&L, Balance Sheet, Excel export, CPA package |
+| **Swipe UI** | | `cleared server`, web swipe UI, chat interface, meta-agent |
+| **Intelligence** | | Self-improvement agents (learning, optimization, testing w/ test ratchet, reconciliation, accrual anticipator, month-end close rehearsal) |
+
+### Foundation Phase — Completed
+
+Built in 4 steps:
+
+| Step | What | Commit |
+|------|------|--------|
+| 1. Project skeleton | Models, CSV I/O, buildinfo, Makefile, CI config | `1f91867` |
+| 2. Services + validation | Config, accounts, journal (6 invariants), gitops, `cleared init` | `d976eb1` |
+| 3. Importer + agent log | Chase CSV parser, importer registry, agent log CSV I/O | `f11df1e` |
+| 4. Agent runtime | Embedded bridge.py, 15 primitives, `cleared agent run`, end-to-end tests | `7ce2df0` |
+
+The Foundation phase delivers a working pipeline: `cleared init` creates a repo, bank CSVs are dropped in `import/`, and `cleared agent run ingest` parses transactions, creates balanced journal entries, moves processed files, commits to git, and logs agent actions.
 
 ## Build & CI
 
